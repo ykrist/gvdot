@@ -6,7 +6,7 @@ fn main() -> io::Result<()> {
   let mut g = gvdot::Graph::new()
     .directed()
     .strict(false)
-    .in_memory()
+    .stream_to_gv(Layout::Dot, "streaming.svg")?
     .attr(attr::RankDir, val::RankDir::LR)?;
 
   g.add_node(1)?
@@ -39,11 +39,6 @@ fn main() -> io::Result<()> {
     .attr(attr::Weight, 1.01)?
     .attr(attr::ArrowHead, [val::ArrowShape::diamond().open(), val::ArrowShape::crow().left_side()])?;
 
-    // .attr(attr::Arro)
-
-  let x = g.into_string();
-  println!("{}", x);
-  render(&x, Layout::Dot, "usage.svg")?;
-  std::fs::write("usage.dot", x)?;
+  g.wait()?;
   Ok(())
 }

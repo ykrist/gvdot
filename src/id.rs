@@ -7,6 +7,12 @@ pub struct StrId<'a> {
   inner: &'a str
 }
 
+impl Default for StrId<'_> {
+  fn default() -> Self {
+    StrId { inner: "gvdot_graph" }
+  }
+}
+
 impl fmt::Display for StrId<'_> {
   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
     f.write_str(self.inner)

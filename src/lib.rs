@@ -45,6 +45,24 @@ pub struct GraphBuilder {
   strict: bool,
 }
 
+#[derive(Debug)]
+pub struct GvPipe {
+  pipe: std::process::ChildStdin,
+  gv: std::process::Child
+}
+
+impl io::Write for GvPipe {
+  #[inline(always)]
+  fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+    // print!("{}", std::str::from_utf8(buf).unwrap());
+    self.pipe.write(buf)
+  }
+  #[inline(always)]
+  fn flush(&mut self) -> io::Result<()> {
+    self.pipe.flush()
+  }
+}
+
 impl GraphBuilder {
   pub fn directed(mut self) -> Self {
     self.directed = true;
@@ -70,13 +88,37 @@ impl GraphBuilder {
 
 
   pub fn in_memory(self) -> Graph<Vec<u8>> {
-    let name = StrId::new("gvdot_graph").unwrap();
-    self.create(name, Vec::new()).unwrap()
+    self.create(StrId::default(), Vec::new()).unwrap()
+  }
+
+  /// Stream the graph directly to a Graphviz layout program
+  pub fn stream_to_gv(self, prog: Layout, filepath: impl AsRef<Path>) -> io::Result<Graph<GvPipe>> {
+    let mut gv = spawn_gv_proc(prog, filepath)?;
+    let pipe = gv.stdin.take().unwrap();
+    self.create(StrId::default(), GvPipe{ pipe, gv })
   }
 }
 
 impl Graph<()> {
   pub fn new() -> GraphBuilder { GraphBuilder::default() }
+}
+
+
+impl Graph<Vec<u8>> {
+  pub fn into_string(mut self) -> String {
+    self.write_end().unwrap();
+    String::from_utf8(self.writer).unwrap()
+  }
+}
+
+impl Graph<GvPipe> {
+  /// Wait for GraphViz to finish writing the file.
+  pub fn wait(mut self) -> io::Result<std::process::ExitStatus> {
+    self.write_end()?;
+    let GvPipe { mut gv, pipe } = self.writer;
+    drop(pipe);
+    gv.wait()
+  }
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, IntoStaticStr)]
@@ -92,29 +134,26 @@ pub enum Layout {
   Osage,
 }
 
-impl Graph<Vec<u8>> {
-  pub fn into_string(mut self) -> String {
-    self.write_end().unwrap();
-    String::from_utf8(self.writer).unwrap()
-  }
-}
 
-pub fn render(dot: &str, prog: Layout, fmt: &str,  filepath: &str) -> io::Result<std::process::ExitStatus> {
+fn spawn_gv_proc(prog: Layout, filepath: impl AsRef<Path>) -> io::Result<std::process::Child> {
   use std::process::{Stdio, Command};
-
   let prog: &'static str = prog.into();
-  let mut gv = Command::new(prog)
-    .args(["-T", fmt, "-o", filepath])
+  let filepath = filepath.as_ref();
+  Command::new(prog)
+    .arg("-T")
+    .arg(filepath.extension().expect("filepath must have an extension"))
+    .arg("-o")
+    .arg(filepath)
     .stdin(Stdio::piped())
     .stdout(Stdio::inherit())
     .stderr(Stdio::inherit())
-    .spawn()?;
-  gv.stdin.take().unwrap().write(dot.as_bytes())?;
-  gv.wait()
+    .spawn()
 }
 
-pub fn render_svg(dot: &str, prog: Layout, filepath: &str) -> io::Result<std::process::ExitStatus> {
-  render(dot, prog, "svg", filepath)
+pub fn render(dot: &str, prog: Layout, filepath: impl AsRef<Path>) -> io::Result<std::process::ExitStatus> {
+  let mut gv = spawn_gv_proc(prog, filepath)?;
+  gv.stdin.take().unwrap().write(dot.as_bytes())?;
+  gv.wait()
 }
 
 impl<W: Write> Graph<W> {
@@ -190,6 +229,8 @@ pub trait GraphComponent: Sized + private::GraphRoot {
 }
 
 use private::{GraphRoot};
+use std::path::Path;
+
 mod private {
   use super::*;
   pub trait GraphRoot {
