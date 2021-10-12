@@ -31,5 +31,26 @@ pub trait Id : fmt::Display {}
 
 impl Id for StrId<'_> {}
 
-impl Id for u64 {}
+macro_rules! impl_id_primitive {
+    ($($t:ty),+$(,)?) => {
+      $(
+        impl Id for $t {}
+      )*
+    };
+}
+
+impl_id_primitive!{
+  u8,
+  u16,
+  u32,
+  u64,
+  u128,
+  usize,
+  i8,
+  i16,
+  i32,
+  i64,
+  i128,
+  isize,
+}
 
