@@ -14,11 +14,10 @@ fn main() -> io::Result<()> {
     .attr_raw("color", "gray")?;
 
   g.modify_nodes()?
-    .attr(attr::Shape, val::Shape::Box3d);
+    .attr(attr::Shape, val::Shape::Box3d)?;
 
   g.add_node(2)?
     .attr(attr::Label, "Node \\N")?
-    // .attr_raw("label", attr::quote_str("Node \\N"))?
     .attr(attr::Color, "blue")?;
 
   {
@@ -45,6 +44,6 @@ fn main() -> io::Result<()> {
   let x = g.into_string();
   println!("{}", x);
   render_svg(&x, Layout::Dot, "scrap.svg")?;
-  std::fs::write("scrap.dot", x);
+  std::fs::write("scrap.dot", x)?;
   Ok(())
 }

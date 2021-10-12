@@ -1,26 +1,17 @@
-use thiserror::Error;
 use std::io::{self, Write};
 use std::fmt;
+use strum::IntoStaticStr;
 
 mod id;
-mod constants;
 pub mod attr;
 
+#[doc(inline)]
 pub use id::{Id, StrId};
 #[doc(inline)]
 pub use crate::attr::Attribute;
 #[doc(inline)]
 pub use attr::values as val;
 
-
-#[derive(Error, Debug, Clone)]
-pub enum DotError {
-  #[error("string is not a valid DOT id")]
-  InvalidStrId
-}
-
-
-pub type DotResult<T> = Result<T, DotError>;
 
 pub struct Node<'a, G: GraphComponent> {
   parent: &'a mut G,
@@ -79,15 +70,8 @@ impl GraphBuilder {
 
 
   pub fn in_memory(self) -> Graph<Vec<u8>> {
-    let GraphBuilder { directed, strict } = self;
-    let mut g = Graph {
-      directed,
-      strict,
-      result: Ok(()),
-      writer: Vec::new(),
-    };
-    g.init(StrId::new("gvdot_graph").unwrap()).unwrap();
-    g
+    let name = StrId::new("gvdot_graph").unwrap();
+    self.create(name, Vec::new()).unwrap()
   }
 }
 
@@ -95,9 +79,17 @@ impl Graph<()> {
   pub fn new() -> GraphBuilder { GraphBuilder::default() }
 }
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, IntoStaticStr)]
+#[strum(serialize_all="lowercase")]
 pub enum Layout {
-  Dot
+  Dot,
+  Neato,
+  Twopi,
+  Circo,
+  Fdp,
+  Sfdp,
+  Patchwork,
+  Osage,
 }
 
 impl Graph<Vec<u8>> {
@@ -110,9 +102,7 @@ impl Graph<Vec<u8>> {
 pub fn render(dot: &str, prog: Layout, fmt: &str,  filepath: &str) -> io::Result<std::process::ExitStatus> {
   use std::process::{Stdio, Command};
 
-  let prog = match prog {
-    Layout::Dot => "dot",
-  };
+  let prog: &'static str = prog.into();
   let mut gv = Command::new(prog)
     .args(["-T", fmt, "-o", filepath])
     .stdin(Stdio::piped())

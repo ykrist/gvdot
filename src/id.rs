@@ -1,5 +1,6 @@
 use std::fmt;
 use lazy_static::lazy_static;
+use thiserror::Error;
 
 #[derive(Debug, Copy, Clone)]
 pub struct StrId<'a> {
@@ -12,16 +13,19 @@ impl fmt::Display for StrId<'_> {
   }
 }
 
+#[derive(Error, Debug, Clone)]
+#[error("string is not a valid DOT id")]
+pub struct InvalidStrId;
 
 impl<'a> StrId<'a> {
-  pub fn new(s: &'a str) -> crate::DotResult<Self> {
+  pub fn new(s: &'a str) -> Result<Self, InvalidStrId> {
     lazy_static! {
         static ref RE: regex::Regex = regex::Regex::new("[a-zA-Z-_][a-zA-Z-_0-9]*").unwrap();
     }
     if (&*RE).is_match(s) {
       Ok(StrId { inner: s })
     } else {
-      Err(crate::DotError::InvalidStrId)
+      Err(InvalidStrId)
     }
   }
 }
