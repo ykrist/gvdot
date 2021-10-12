@@ -1,40 +1,50 @@
 use std::io;
-use gvdot::{GraphComponent, StrId};
+use gvdot::*;
 
 
 fn main() -> io::Result<()> {
-  let mut buf = Vec::new();
-
   let mut g = gvdot::Graph::new()
     .directed()
     .strict(false)
-    .create(0, &mut buf)?;
+    .in_memory()
+    .attr(attr::RankDir, val::RankDir::LR)?;
 
   g.add_node(1)?
-    .set_attr("color", "gray")?;
+    .attr(attr::Label, attr::html("hello <i>m8</i>"))?
+    .attr_raw("color", "gray")?;
+
+  g.modify_nodes()?
+    .attr(attr::Shape, val::Shape::Box3d);
 
   g.add_node(2)?
-    .set_attr("color", "blue")?;
+    .attr(attr::Label, "Node \\N")?
+    // .attr_raw("label", attr::quote_str("Node \\N"))?
+    .attr(attr::Color, "blue")?;
 
   {
     let mut s = g.add_subgraph(100)?;
 
     s.add_node(StrId::new("foo").unwrap())?
-      .set_attr("label", "Hello there!")?;
+      .attr_raw("label", attr::quote("Hello there!"))?;
 
     let mut ss = s.add_subgraph(1000)?
-      .set_attr("rank", "same")?;
+      .attr_raw("rank", "same")?;
 
     ss.add_node(420)?;
-    ss.add_node(421)?;
-    ss.add_edge(420, 421)?.set_attr("label", "oh no")?;
+    ss.add_node(421)?
+      .attr_raw("shape", "square")?;
+    ss.add_edge(420, 421)?.attr_raw("label", attr::quote("oh no"))?;
   }
 
-  g.add_edge(1, 2)?;
-  g.finish()?;
+  g.add_edge(1, 2)?
+    .attr(attr::Weight, 1.01)?
+    .attr(attr::ArrowHead, [val::ArrowShape::diamond().open(), val::ArrowShape::crow().left_side()])?;
 
-  let x = std::str::from_utf8(&buf).unwrap();
+    // .attr(attr::Arro)
 
+  let x = g.into_string();
   println!("{}", x);
+  render_svg(&x, Layout::Dot, "scrap.svg")?;
+  std::fs::write("scrap.dot", x);
   Ok(())
 }
